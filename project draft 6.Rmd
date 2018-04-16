@@ -1,0 +1,467 @@
+---
+title: "TED 영상 views 분석"
+author: "R린이"
+date: "2018년 4월 17일"
+output: html_document
+---
+<br/>
+<br/>  
+
+### **[ 왜 TED인가? ]**
+
+<br/>
+R린이 구성원들이 공통으로 관심 있었던 분야 : **텍스트 마이닝**, **마케팅**  
+영상은 **'tag'**라는 **텍스트(텍스트 마이닝)**를 통해 **'범주화'**와 **'노출(마케팅)'**이 동시에 이뤄지는 매체적 특성이 존재한다고 파악
+<br/>
+<br/>
+하지만, 보통 영상은 **'정보전달'**뿐 아니라 **'광고'**, **'여론형성'**, **'단순노출'** 등  
+그 목적이 다양하기 때문에 변수간의 실질적인 관계를 파악하기 힘들 소지가 다분함.
+<br/>
+<br/>
+따라서, 효과적인 **'정보전달'**이라는 뚜렷한 목적을 가진 **'TED'**를 통해  
+**교육적인 영상**에서 변수들 간의 관계를 살펴보고자 함.
+<br/>
+<br/>
+목적적, 경제적 결과를 고려했을 때,    
+영상의 효과를 나타내는 가장 실질적인 지표(종속변수)는 **'views'**라고 판단. 
+<br/>
+<br/>
+이 분석의 결과는 앞으로 Youtube를 통해 강의의 장을 넓히길 원하시는  
+**'이부일 강사님'**같은 분께 도움이 될거라 기대함.
+<br/>   
+<br/>   
+<br/>   
+
+
+### **[ 목표 ]**
+
+<br/>
+**1. 영상의 views에 어떤 요인들이 영향을 미치는지 알아보기**  
+    - 영상의 흥행에 가장 큰 설명요인은 '담고 있는 내용'과 '편집을 통한 전달력'을 포함한 '콘텐츠의 질'이라고 해도 과언이 아니다.    
+하지만 영상을 분석할 때, 콘텐츠의 질과 관련된 양적자료를 구하는 것은 쉽지 않은 일이며,   
+특히 수많은 케이스를 분석하는 빅데이터 분석에서는 불가능에 가깝다고 할 수 있다.  
+따라서, 해당 영상과 기본적으로 연계되면서 자동으로 쌓이는 데이터('comments', 'duration', 'film_date', 'languages', 'published_date', 'ratings', 'related_talks', 'speaker_occupation', 'tags')들을 사용해서 'views'에 미치는 영향력 파악하고자 한다.
+<br/>  
+<br/>  
+**2. views를 높일 수 있는 현실적인 방법 탐색**    
+    - 영상이라는 매체가 일방향에서 쌍방향으로 나아가고 있는 추세 속에서,   
+개인 단위의 방송은 점차 늘고 있으며, 개인의 수준에서 할 수 있는 노력에 관심이 집중되고 있다.  
+따라서, 현실적 흐름에 맞춰 비록 효과가 가시적으로 드러나진 않더라도,   
+개인의 입장에서 views를 올릴 수 있는 실질적 대안을 제시하고자 한다.  
+<br/>   
+<br/>   
+<br/>     
+
+### **[ library ]**
+<br/>
+```{r message=FALSE, warning=FALSE, paged.print=FALSE}
+library = c("readxl", "car", "dplyr", "lm.beta", "ggvis", "psych", "gvlma", "corrplot")
+for(i in 1:length(library)){library(library[i], character.only = T)}
+```
+<br/>
+<br/>
+<br/> 
+
+### **[ 파일 불러오기 ]**
+<br/>
+```{r message=FALSE, warning=FALSE, paged.print=FALSE}
+rm(list = ls())
+tedDF0 <- readxl::read_excel(path = "D:/R/project1/real/Raw Data 2.xlsx",
+                             sheet = 3,
+                             col_names = TRUE)
+```
+<br/>
+<br/>     
+<br/>       
+
+### **[ Introduction / Data set ]**  
+<br/>  
+| Data Name            | "TED Data Analysis"  |  
+| -------------------- | -------------------- |  
+| 출처                 | https://www.kaggle.com/rounakbanik/ted-data-analysis   |  
+| Case number_total    | 2550  |  
+| Case number_error    | 16 (shaking)  |    
+| Case number_analysis | 2534  |  
+| Numeric variable     | 7  |  
+| Character variable   | 10 |  
+<br/>  
+<br/>  
+<br/>  
+
+
+###**[ 전처리 과정 : Excel로 전처리를 할수밖에 없었던 이유 ]**  
+
+<br/>  
+**(엑셀 파일 참고)**   
+<br/>  
+
+1. 주요변수('ratings', 'related_talks', 'tags')들의 실질적 변수화 과정 필요.
+<br/>  
+2. 유의미하다고 판단되는 변수('speaker_occupation', 'tags')등의 질적 변수화 과정 필요.
+<br/>  
+3. 'tags'의 경우 여러 tag들 중 하나의 유의미한 범주로 구분하는 작업 필요.
+<br/>  
+<br/> 
+<br/> 
+<br/> 
+
+---
+
+# **[ EDA / 데이터 시각화 / 기술 통계 ]**
+
+<br/>  
+**Q1.** **'ratings'**간에는 어떤 상관관계가 있는가?
+<br/>  
++ 14가지 ratings 각각의 상관관계와, 크게 negative ratings와 positive ratings로 묶어서 그 관계를 살펴봄.   
++ 각각의 절대적인 rating 수는 영상의 views에 직접적인 영향을 받기 때문에,   
+  각각 해당 영상의 전체 rating 수를 나눠줘, 비중으로 살펴봄. 
+<br/>  
+```{r}
+tmp <- tedDF0 %>% select(36, 45:58)
+tmp$rowSum <- apply(tmp, 1, sum)
+tmp$p_Obnoxious        <- (tmp$Obnoxious      /tmp$rowSum)*100
+tmp$p_Unconvincing     <- (tmp$Unconvincing   /tmp$rowSum)*100
+tmp$p_Confusing        <- (tmp$Confusing      /tmp$rowSum)*100
+tmp$p_Longwinded       <- (tmp$Longwinded     /tmp$rowSum)*100
+tmp$p_OK               <- (tmp$OK             /tmp$rowSum)*100
+tmp$p_Funny            <- (tmp$Funny          /tmp$rowSum)*100
+tmp$p_Beautiful        <- (tmp$Beautiful      /tmp$rowSum)*100
+tmp$p_Informative      <- (tmp$Informative    /tmp$rowSum)*100
+tmp$p_Persuasive       <- (tmp$Persuasive     /tmp$rowSum)*100
+tmp$p_Courageous       <- (tmp$Courageous     /tmp$rowSum)*100
+tmp$p_Inspiring        <- (tmp$Inspiring      /tmp$rowSum)*100
+tmp$p_Fascinating      <- (tmp$Fascinating    /tmp$rowSum)*100
+tmp$p_Ingenious        <- (tmp$Ingenious      /tmp$rowSum)*100
+tmp$p_Jaw_dropping     <- (tmp$Jaw_dropping   /tmp$rowSum)*100
+tmp1 <- tmp %>% select(1, 17:28)
+tmp1$negative <- apply(tmp1[,2:5], 1, sum)
+tmp1$positive <- apply(tmp1[,7:13], 1, sum)
+corrplot(cor(tmp1, use="complete.obs"),type="lower")
+```
+
+<br/>  
+Dataset 확인과 ratings 상관분석 결과 알게 점:
+<br/>  
+  1. 검사 결과, 각각의 ratings 간의 관계를 살펴보는것 보다 **negative**와 **positive**로 분류하여 보는것이 더 뚜렷한 차이를 확인할 수 있다고 판단함.  
+<br/>  
+  2. raw data상에서 추천영상은 6개까지 있는데, 이들 영상과 메인영상 간에는 **'노출'**이라는 관계가 있기때문에 연관성이 양의 상관관계가 존재할것이라 예상함.  
+<br/>  
+  3. **'speaker type'**과 **'talk type'**을 더미변수화하여 **'communicater'**와 **'contents'**에 따라 추천영상이 views에 미치는 영향력의 차이를 살펴보고자 함.   
+<br/>  
+<br/> 
+```{r}
+## speaker job type dummy변수 생성
+tedDF0$speaker.type.dum <- as.factor(tedDF0$Speaker_type_2)
+tedDF0$speaker.type.dum <- factor(tedDF0$Speaker_type_2, levels = c("etc", "Humanity", "Science", "Art & Performance"))
+
+##related_1 산점도
+tedDF0 %>% ggvis(~related_talks_1_view, ~views, fill = ~speaker.type.dum) %>%
+  layer_points() %>% 
+  layer_smooths()
+
+
+##related_2 산점도
+tedDF0 %>% ggvis(~related_talks_2_view, ~views, fill = ~speaker.type.dum) %>%
+  layer_points() %>% 
+  layer_smooths()
+
+##related_3 산점도
+tedDF0 %>% ggvis(~related_talks_3_view, ~views, fill = ~speaker.type.dum) %>%
+  layer_points() %>% 
+  layer_smooths()
+
+##related_4 산점도
+tedDF0 %>% ggvis(~related_talks_4_view, ~views, fill = ~speaker.type.dum) %>%
+  layer_points() %>% 
+  layer_smooths()
+
+##related_5 산점도
+tedDF0 %>% ggvis(~related_talks_5_view, ~views, fill = ~speaker.type.dum) %>%
+  layer_points() %>% 
+  layer_smooths()
+
+##related_6 산점도
+tedDF0 %>% ggvis(~related_talks_6_view, ~views, fill = ~speaker.type.dum) %>%
+  layer_points() %>% 
+  layer_smooths()
+```
+<br/>  
+views 극단치 잘라보기(기술통계로 확인)
+<br/>  
+```{r}
+statistic <- tedDF0 %>% 
+  group_by(speaker.type.dum) %>% 
+  summarise(count = n(), mean = mean(views), SD = sd(views), min = min(views) ,max = max(views))
+print(statistic)
+
+tedDF0 <- tedDF0 %>% filter(views <= 10000000)
+
+statistic <- tedDF0 %>% 
+  group_by(speaker.type.dum) %>% 
+  summarise(count = n(), mean = mean(views), SD = sd(views), min = min(views), max = max(views))
+print(statistic)
+```
+<br/>  
+<br/>  
+<br/>  
+
+```{r}
+tedDF0$speaker.type.dum <- as.factor(tedDF0$Speaker_type_2)
+tedDF0$speaker.type.dum <- factor(tedDF0$Speaker_type_2, levels = c("etc", "Humanity", 
+                                                                    "Science", "Art & Performance"))
+
+##related_1 산점도
+tedDF0 %>% ggvis(~related_talks_1_view, ~views, fill = ~speaker.type.dum) %>%
+  layer_points() %>% 
+  layer_smooths()
+
+##related_2 산점도
+tedDF0 %>% ggvis(~related_talks_2_view, ~views, fill = ~speaker.type.dum) %>%
+  layer_points() %>% 
+  layer_smooths()
+
+##related_3 산점도
+tedDF0 %>% ggvis(~related_talks_3_view, ~views, fill = ~speaker.type.dum) %>%
+  layer_points() %>% 
+  layer_smooths()
+
+##related_4 산점도
+tedDF0 %>% ggvis(~related_talks_4_view, ~views, fill = ~speaker.type.dum) %>%
+  layer_points() %>% 
+  layer_smooths()
+
+##related_5 산점도
+tedDF0 %>% ggvis(~related_talks_5_view, ~views, fill = ~speaker.type.dum) %>%
+  layer_points() %>% 
+  layer_smooths()
+
+##related_6 산점도
+tedDF0 %>% ggvis(~related_talks_6_view, ~views, fill = ~speaker.type.dum) %>%
+  layer_points() %>% 
+  layer_smooths()
+
+
+```
+```{r}
+
+## talk contents type dummy변수 생성(기준 = etc)
+tedDF0$talk.type.dum <- as.factor(tedDF0$tags_type2)
+tedDF0$talk.type.dum <- factor(tedDF0$tags_type2, levels = c("etc", "Humanity", "Science", "Art & Performance"))
+
+##related_1 산점도
+tedDF0 %>% ggvis(~related_talks_1_view, ~views, fill = ~talk.type.dum) %>%
+  layer_points() %>% 
+  layer_smooths()
+
+##related_2 산점도
+tedDF0 %>% ggvis(~related_talks_2_view, ~views, fill = ~talk.type.dum) %>%
+  layer_points() %>% 
+  layer_smooths()
+
+##related_3 산점도
+tedDF0 %>% ggvis(~related_talks_3_view, ~views, fill = ~talk.type.dum) %>%
+  layer_points() %>% 
+  layer_smooths()
+
+##related_4 산점도
+tedDF0 %>% ggvis(~related_talks_4_view, ~views, fill = ~talk.type.dum) %>%
+  layer_points() %>% 
+  layer_smooths()
+
+##related_5 산점도
+tedDF0 %>% ggvis(~related_talks_5_view, ~views, fill = ~talk.type.dum) %>%
+  layer_points() %>% 
+  layer_smooths()
+
+##related_6 산점도
+tedDF0 %>% ggvis(~related_talks_6_view, ~views, fill = ~talk.type.dum) %>%
+  layer_points() %>% 
+  layer_smooths()
+
+```
+<br/>  
+<br/>  
+각 관련 영상의 views와 해당 영상의 views의 관계에서  
+speaker.type과 talk.type의 차이를 가시적으로 판단하기에는 무리가 있었음.
+<br/>  
+
+
+# **[ 회귀분석 ]**
+<br/>  
+소수점 자릿수 조정
+```{r}
+options(scipen = 100)
+```
+
+<br/> 
+
+## [ Preliminary Model ]
+<br/>  
+**'views 대비 comments의 비중', '관련 영상의 views', '관련영상 대비 해당 영상의 선호도', '전체 ratings', 'rating 비중(긍정/부정)', '영상의 총 길이', '촬영부터 영상게시까지 소요된 시간', '영상공개 시점'**등이 views에 영향을 줄것이라고 판단하고 1차 모델링 시행.  
+<br/>  
+```{r message=FALSE, warning=FALSE, paged.print=FALSE}
+lm.test1 <- lm(views ~ comments_d_views + related_talks_1_view  + related_talks_2_view + related_talks_3_view + related_talks_4_view + related_talks_5_view + related_talks_6_view  + view_d_total + rating_total + rating_p + rating_n + duration + delay + published_date, data = tedDF0) 
+summary(lm.test1)
+```
+<br/>
+<br/>
+
+유의확률 0.000이므로, 유의수준 0.05에서   
+회귀모형은 타당하지 않다는 귀무가설을 기각하면서   
+회귀모형은 타당하다는 결론을 얻을 수 있었다.
+<br/>  
+<br/>  
+
+하지만, 
+<br/>  
+귀무가설 : 독립변수는 종속변수에게 영향을 주지 않는다.  
+대립가설 : 독립변수는 종속변수에게 영향을 준다.
+<br/>  
+결론 : "duration", "delay" 를 제외한 독립변수들은 유의확률이 0.000이므로 유의수준 0.05에서  
+        독립변수는 종속변수에게          통계적으로 유의한 영향을 준다
+<br/>  
+<br/>  
+<br/>  
+
+---
+
+## [ Secondary Model ] 
+
+<br/>
+
+불필요한 변수들을 제거하기 위해, 다시 한번 **'stepwise 방법'**을 활용해 변수 선택함  
+```{r message=FALSE, warning=FALSE, include=FALSE, paged.print=FALSE}
+lm.test2 <- step(lm.test1, direction = "both")
+AIC(lm.test2)
+```
+
+```{r}
+# lm.test2 <- step(lm.test1, direction = "both")
+# AIC(lm.test2)
+summary(lm.test2)
+```
+<br/>
+
+#### 1단계 : 회귀모형은 통계적으로 타당한가? 
+
+<br/>  
+귀무가설 : 회귀모형은 타당하지 않다.  
+대립가설 : 회귀모형은 타당하다.
+<br/>  
+    F-statistic:  1020 on 12 and 2401 DF,  p-value: < 0.00000000000000022
+<br/>  
+결론 : 회귀모형은 타당하다.
+<br/>  
+<br/> 
+
+
+#### 2단계 : 독립변수는 종속변수에 영향을 주는가?
+
+<br/>  
+귀무가설 : 독립변수는 종속변수에게 영향을 주지 않는다.  
+대립가설 : 독립변수는 종속변수에게 영향을 준다.
+<br/>  
+결론 : 모든 독립변수들의 유의확률이 0.000으로 유의수준 0.05에서 독립변수는 종속변수에게 통계적으로 유의한
+        영향을 주고 있음.   
+        하지만 첫 모델에서 나온 결론대로 stepwise에서는 publish_date을 제거하지 못함. 
+        최종 모델에서는 수동으로 제거함
+
+<br/> 
+<br/>  
+그리고 검증된 독립변수들끼리 다중공선성을 확인하여 최종 모델에서 필요한 독립변수를 결정하기로 함.
+<br/>  
+<br/>  
+
+#### 표준화 회귀계수 
+
+```{r}
+lm.beta(lm.test2) 
+```
+<br/>  
+<br/>  
+
+#### 다중공선성 체크 
+
+<br/>
+```{r}
+vif(lm.test2)
+```
+
+결론: "rating_p"와 "rating_n"은 VIF의 값이 10 이상이므로 두 독립변수들은 나머지 변수들과 선형의 상관관계가 존재한다고 파악함.  
+      따라서 "rating_p"와 "rating_n" 역시 최종 모델에서는 제거
+
+<br/>  
+<br/>  
+<br/>  
+
+---
+
+# [ Final Model ] 
+
+```{r}
+lm.test3 <- lm(views ~ comments_d_views + related_talks_1_view  + related_talks_2_view + related_talks_3_view +
+               related_talks_4_view + related_talks_5_view + related_talks_6_view  + view_d_total + 
+               published_date + rating_total, data = tedDF0) 
+summary(lm.test3)
+```
+<br/>  
+<br/>  
+
+#### 1단계 : 회귀모형은 통계적으로 타당한가?  
+
+<br/>  
+귀무가설 : 회귀모형은 타당하지 않다.  
+대립가설 : 회귀모형은 타당하다.
+<br/>  
+  F-statistic:  1400 on 10 and 2437 DF,  p-value: < 0.00000000000000022
+<br/>  
+결론 : 회귀모형은 타당하다.
+<br/>  
+<br/> 
+
+#### 2단계 : 독립변수는 종속변수에 영향을 주는가?
+
+<br/>
+귀무가설 : 독립변수는 종속변수에게 영향을 주지 않는다.  
+대립가설 : 독립변수는 종속변수에게 영향을 준다.
+<br/>  
+결론 : 모든 독립변수의 유의확률이 0.000이므로 유의수준 0.05에서 독립변수는 종속변수에게 통계적으로 유의한 영향을 준다.
+<br/>  
+<br/> 
+
+#### 3단계 : 독립변수(들)는 어떠한 영향을 주는가?
+
+  <br/>
+                                Estimate  
+    (Intercept)           |  -422772.692871  
+    comments_d_views      | -9080550.272795  
+    related_talks_1_view  |      0.044647  
+    related_talks_2_view  |      0.055131  
+    related_talks_3_view  |      0.038947  
+    related_talks_4_view  |      0.054952  
+    related_talks_5_view  |      0.066599  
+    related_talks_6_view  |      0.079866  
+    view_d_total          |  62676.543929  
+    published_date        |     0.0008255  
+    rating_total          |    218.158560  
+    
+  <br/>
+  <br/>
+
+#### 4단계 : 회귀모형의 설명력 = 독립변수들의 설명력
+<br/>  
+  Multiple R-squared:  0.8517,	Adjusted R-squared:  0.8511 
+<br/>  
+<br/>  
+<br/>  
+
+
+---
+
+# Q & A
+<br/>  
+<br/>  
+<br/>  
+<br/>  
+<br/>  
+<br/>  
